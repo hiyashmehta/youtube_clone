@@ -98,9 +98,24 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.1.8
         version: 1.1.8(@types/react-dom@19.0.4(@types/react@19.0.10))(@types/react@19.0.10)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@tanstack/react-query':
+        specifier: ^5.66.9
+        version: 5.66.9(react@19.0.0)
+      '@trpc/client':
+        specifier: 11.0.0-rc.814
+        version: 11.0.0-rc.814(@trpc/server@11.0.0-rc.814(typescript@5.7.3))(typescript@5.7.3)
+      '@trpc/react-query':
+        specifier: 11.0.0-rc.814
+        version: 11.0.0-rc.814(@tanstack/react-query@5.66.9(react@19.0.0))(@trpc/client@11.0.0-rc.814(@trpc/server@11.0.0-rc.814(typescript@5.7.3))(typescript@5.7.3))(@trpc/server@11.0.0-rc.814(typescript@5.7.3))(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(typescript@5.7.3)
+      '@trpc/server':
+        specifier: 11.0.0-rc.814
+        version: 11.0.0-rc.814(typescript@5.7.3)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
+      client-only:
+        specifier: ^0.0.1
+        version: 0.0.1
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -152,6 +167,9 @@ importers:
       recharts:
         specifier: ^2.15.1
         version: 2.15.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
       sonner:
         specifier: ^2.0.0
         version: 2.0.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -1583,6 +1601,35 @@ packages:
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
+
+  '@tanstack/query-core@5.66.4':
+    resolution: {integrity: sha512-skM/gzNX4shPkqmdTCSoHtJAPMTtmIJNS0hE+xwTTUVYwezArCT34NMermABmBVUg5Ls5aiUXEDXfqwR1oVkcA==}
+
+  '@tanstack/react-query@5.66.9':
+    resolution: {integrity: sha512-NRI02PHJsP5y2gAuWKP+awamTIBFBSKMnO6UVzi03GTclmHHHInH5UzVgzi5tpu4+FmGfsdT7Umqegobtsp23A==}
+    peerDependencies:
+      react: ^18 || ^19
+
+  '@trpc/client@11.0.0-rc.814':
+    resolution: {integrity: sha512-X++trN7KifRvLWXVmDFSSaCS8wHCdfUrttU/8jJlkWCAYvjsjFHX2IsyBUCRS+FVwat9GMRcut0Bg3itmoIIHQ==}
+    peerDependencies:
+      '@trpc/server': 11.0.0-rc.814+f490f467f
+      typescript: '>=5.7.2'
+
+  '@trpc/react-query@11.0.0-rc.814':
+    resolution: {integrity: sha512-g0zpR2+tn4mM7IPorfoJ7gC8l1aHTpcIVI+oRUO8CgsA/3P06IZ7+TUyywZCd9qPQldzz5pb2T/aquQf1Ffq3g==}
+    peerDependencies:
+      '@tanstack/react-query': ^5.62.8
+      '@trpc/client': 11.0.0-rc.814+f490f467f
+      '@trpc/server': 11.0.0-rc.814+f490f467f
+      react: '>=18.2.0'
+      react-dom: '>=18.2.0'
+      typescript: '>=5.7.2'
+
+  '@trpc/server@11.0.0-rc.814':
+    resolution: {integrity: sha512-tbYYpJIjYa6YVzujuPmTczIdmGH8XZwGmncO4uNa+CP/u/EECbtykkyGHx+tSi9ZjSK6fRcIvm9AGiUWzF7cmw==}
+    peerDependencies:
+      typescript: '>=5.7.2'
 
   '@types/d3-array@3.2.1':
     resolution: {integrity: sha512-Y2Jn2idRrLzUfAKV2LyRImR+y4oa2AntrgID95SHJxuMUrkNXmanDSed71sRNZysveJVt1hLLemQZIady0FpEg==}
@@ -4730,6 +4777,31 @@ snapshots:
   '@swc/helpers@0.5.15':
     dependencies:
       tslib: 2.8.1
+
+  '@tanstack/query-core@5.66.4': {}
+
+  '@tanstack/react-query@5.66.9(react@19.0.0)':
+    dependencies:
+      '@tanstack/query-core': 5.66.4
+      react: 19.0.0
+
+  '@trpc/client@11.0.0-rc.814(@trpc/server@11.0.0-rc.814(typescript@5.7.3))(typescript@5.7.3)':
+    dependencies:
+      '@trpc/server': 11.0.0-rc.814(typescript@5.7.3)
+      typescript: 5.7.3
+
+  '@trpc/react-query@11.0.0-rc.814(@tanstack/react-query@5.66.9(react@19.0.0))(@trpc/client@11.0.0-rc.814(@trpc/server@11.0.0-rc.814(typescript@5.7.3))(typescript@5.7.3))(@trpc/server@11.0.0-rc.814(typescript@5.7.3))(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(typescript@5.7.3)':
+    dependencies:
+      '@tanstack/react-query': 5.66.9(react@19.0.0)
+      '@trpc/client': 11.0.0-rc.814(@trpc/server@11.0.0-rc.814(typescript@5.7.3))(typescript@5.7.3)
+      '@trpc/server': 11.0.0-rc.814(typescript@5.7.3)
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
+      typescript: 5.7.3
+
+  '@trpc/server@11.0.0-rc.814(typescript@5.7.3)':
+    dependencies:
+      typescript: 5.7.3
 
   '@types/d3-array@3.2.1': {}
 
