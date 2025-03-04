@@ -3,7 +3,7 @@ import { Carousel, CarouselApi, CarouselContent, CarouselItem, CarouselNext, Car
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { index } from "drizzle-orm/mysql-core";
+// import { index } from "drizzle-orm/mysql-core";
 import { Skeleton } from "./ui/skeleton";
 
 interface FilterCarouselProps {
