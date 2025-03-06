@@ -6,6 +6,7 @@ import {
     VideoAssetErroredWebhookEvent,
     VideoAssetReadyWebhookEvent,
     VideoAssetTrackReadyWebhookEvent,
+    VideoAssetDeletedWebhookEvent,
 } from "@mux/mux-node/resources/Webhooks";
 import { mux } from "@/lib/mux";
 import { db } from "@/db";
@@ -13,11 +14,12 @@ import { videos } from "@/db/schema";
 
 const SIGNING_SECRET = process.env.MUX_WEBHOOK_SECRET!;
 
-type webhookEvent = 
+type WebhookEvent = 
     | VideoAssetCreatedWebhookEvent
     | VideoAssetErroredWebhookEvent
     | VideoAssetReadyWebhookEvent
-    | VideoAssetTrackReadyWebhookEvent;
+    | VideoAssetTrackReadyWebhookEvent
+    | VideoAssetDeletedWebhookEvent;
 
 export const POST = async (request: Request) => {
     if(!SIGNING_SECRET) {
@@ -88,6 +90,59 @@ export const POST = async (request: Request) => {
                 })
                 .where(eq(videos.muxUploadId, data.upload_id));
                 break;
+        }
+
+        case "video.asset.errored": {
+            const data = payload.data as VideoAssetErroredWebhookEvent["data"];
+
+            if(!data.upload_id) {
+                return new Response("Missing upload ID", { status: 400 });
+            }
+
+            await db
+                .update(videos)
+                .set({
+                    muxStatus: data.status,
+                })
+                .where(eq(videos.muxUploadId, data.upload_id));
+            break;
+        }
+
+        case "video.asset.deleted": {
+            const data = payload.data as VideoAssetDeletedWebhookEvent["data"];
+
+            if(!data.upload_id) {
+                return new Response("Missing upload ID", { status: 400 });
+            }
+
+            await db
+                .delete(videos)
+                .where(eq(videos.muxUploadId, data.upload_id));
+            break;
+        }
+
+        case "video.asset.track.ready": {
+            const data = payload.data as VideoAssetTrackReadyWebhookEvent["data"] & {
+                asset_id: string;
+            }
+
+            // Typescript incorrectly says that asset_id does not exist
+            const assetId = data.asset_id;
+            const trackId = data.id;
+            const status = data.status;
+
+            if (!assetId) {
+                return new Response("Missing Asset ID", { status: 400 });
+            }
+
+            await db
+                .update(videos)
+                .set({
+                    muxTrackId: trackId,
+                    muxTrackStatus: status,
+                })
+                .where(eq(videos.muxAssetId, assetId));
+            break;
         }
     }
 
