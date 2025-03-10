@@ -80,7 +80,7 @@ export const FilterCarousel = ({
                         <CarouselItem 
                         key={item.value} 
                         className="pl-3 basis-auto" 
-                        onClick={() => onSelect(item.value)}>
+                        onClick={() => onSelect(item.value ?? null)}>
                             <Badge
                                 variant={value === item.value ? "default" : "secondary"}
                                 className="rounded-lg px-3 py-1 cursor-pointer whitespace-nowrap text-sm"
