@@ -13,7 +13,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { CopyCheckIcon, CopyIcon, Globe2Icon, ImagePlusIcon, LockIcon, MoreVerticalIcon, RotateCcwIcon, SparklesIcon, TrashIcon } from "lucide-react";
+import { CopyCheckIcon, CopyIcon, Globe2Icon, ImagePlusIcon, Loader2Icon, LockIcon, MoreVerticalIcon, RotateCcwIcon, SparklesIcon, TrashIcon } from "lucide-react";
 import {
     Form,
     FormControl,
@@ -82,6 +82,24 @@ const FormSectionSuspense = ({ videoId }: FormSectionProps) => {
             utils.studio.getMany.invalidate();
             toast.success("Video removed");
             router.push("/studio");
+        },
+        onError: () => {
+            toast.error("Something went wrong");
+        }
+    });
+
+    const generateTitle = trpc.videos.generateTitle.useMutation({
+        onSuccess: () => {
+            toast.success("Background job started", { description: "This may take some time" });
+        },
+        onError: () => {
+            toast.error("Something went wrong");
+        }
+    });
+
+    const generateThumbnail = trpc.videos.generateThumbnail.useMutation({
+        onSuccess: () => {
+            toast.success("Background job started", { description: "This may take some time" });
         },
         onError: () => {
             toast.error("Something went wrong");
@@ -162,8 +180,22 @@ const FormSectionSuspense = ({ videoId }: FormSectionProps) => {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>
-                                            Title
-                                            {/* Add AI generate button */}
+                                            <div className="flex items-center gap-x-2">
+                                                Title   
+                                                <Button
+                                                    size="icon"
+                                                    variant="outline"
+                                                    type="button"
+                                                    className="rounded-full size-6 {&_svg}:size-3"
+                                                    onClick={() => generateTitle.mutate({ id: videoId })}
+                                                    disabled={generateTitle.isPending}
+                                                >
+                                                    {generateTitle.isPending
+                                                        ? <Loader2Icon className="animate-spin" />
+                                                        : <SparklesIcon />
+                                                    }
+                                                </Button>
+                                            </div>
                                         </FormLabel>
                                         <FormControl>
                                             <Input
@@ -181,8 +213,22 @@ const FormSectionSuspense = ({ videoId }: FormSectionProps) => {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>
-                                            Description
-                                            {/* Add AI generate button */}
+                                        <div className="flex items-center gap-x-2">
+                                                Description  
+                                                <Button
+                                                    size="icon"
+                                                    variant="outline"
+                                                    type="button"
+                                                    className="rounded-full size-6 {&_svg}:size-3"
+                                                    onClick={() => generateTitle.mutate({ id: videoId })}
+                                                    disabled={generateTitle.isPending}
+                                                >
+                                                    {generateTitle.isPending
+                                                        ? <Loader2Icon className="animate-spin" />
+                                                        : <SparklesIcon />
+                                                    }
+                                                </Button>
+                                            </div>
                                         </FormLabel>
                                         <FormControl>
                                             <Textarea
@@ -226,7 +272,9 @@ const FormSectionSuspense = ({ videoId }: FormSectionProps) => {
                                                             <ImagePlusIcon className="size-4 mr-1" />
                                                             Change
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => generateThumbnail.mutate({ id: videoId })}
+                                                        >
                                                             <SparklesIcon className="size-4 mr-1" />
                                                             AI-Generated
                                                         </DropdownMenuItem>
