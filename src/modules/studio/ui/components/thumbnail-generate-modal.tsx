@@ -88,6 +88,7 @@ export const ThumbnailGenerateModal = ({
                     />
                     <div className="flex justify-end">
                         <Button 
+                            disabled={generateThumbnail.isLoading}
                             type="submit"
                         >
                             Generate
