@@ -133,7 +133,11 @@ export const commentRelations = relations(comments, ({ one }) => ({
         fields: [comments.videoId],
         references: [videos.id],
     }),
-}))
+}));
+
+export const commentSelectSchema = createSelectSchema(comments);
+export const commentInsertSchema = createInsertSchema(comments);
+export const commentUpdateSchema = createUpdateSchema(comments);
 
 export const videoViews = pgTable("video_views", {
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
