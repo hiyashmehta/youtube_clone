@@ -14,10 +14,13 @@
 		"@clerk/nextjs": "^4.29.7",
 		"@mux/mux-node": "^7.0.0",
 		"@uploadthing/react": "^6.4.0",
+		"date-fns": "^4.1.0",
 		"drizzle-orm": "^0.29.3",
+		"lucide-react": "^0.487.0",
 		"next": "14.1.0",
 		"react": "^18",
 		"react-dom": "^18",
+		"sonner": "^2.0.3",
 		"uploadthing": "^6.4.0",
 		"zod": "^3.22.4"
 	},
