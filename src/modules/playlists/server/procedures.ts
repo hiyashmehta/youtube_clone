@@ -1,3 +1,4 @@
+import { playlists, playlistVideos } from './../../../db/schema';
 import { TRPCError } from '@trpc/server';
 import { db } from "@/db";
 import { z } from "zod";
@@ -6,6 +7,64 @@ import {  createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { and, desc, eq, getTableColumns, lt, or } from "drizzle-orm";
 
 export const playlistsRouter = createTRPCRouter({
+    getMany: protectedProcedure
+    .input(
+        z.object({
+            cursor: z.object({
+                id: z.string().uuid(),
+                updatedAt: z.date(),
+            })
+            .nullish(),
+            limit: z.number().min(1).max(100),
+        }),
+    )
+    .query(async ({ input, ctx }) => {
+        const { id: userId } = ctx.user;
+        const { cursor, limit } = input;
+
+        const data = await db
+        .select({
+            ...getTableColumns(playlists),
+            videoCount: db.$count(
+                playlistVideos,
+                eq(playlists.id, playlistVideos.playlistId)
+            ),
+            user: users,
+        })
+        .from(playlists)
+        .innerJoin(users, eq(videos.userId, users.id))
+        .where(and(
+            eq(playlists.userId, userId),
+            cursor
+                ? or(
+                    lt(playlists.updatedAt, cursor.updatedAt),
+                    and(
+                        eq(playlists.updatedAt, cursor.updatedAt),
+                        lt(playlists.id, cursor.id)
+                    )
+                )
+                : undefined,
+        )).orderBy(desc(playlists.updatedAt), desc(playlists.id))
+        .limit(limit + 1);
+
+        const hasMore = data.length > limit;
+        // Remove the last item if there is more data
+        const items = hasMore ? data.slice(0, -1) : data;
+        // Set the next cursor to the last item if there is more data
+        const lastItem = items[items.length -1];
+        const nextCursor = hasMore 
+        ? {
+            id: lastItem.id,
+            updatedAt: lastItem.updatedAt,
+        }
+        : null
+
+        return {
+            items,
+            nextCursor,
+        };
+    }),
+    
     create: protectedProcedure
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
