@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DEFAULT_LIMIT } from "@/constants";
 import { trpc } from "@/trpc/client";
 import { Loader2Icon, SquareCheckIcon, SquareIcon } from "lucide-react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 interface PlaylistAddModalProps {
@@ -32,6 +33,32 @@ export const PlaylistAddModal = ({
         getNextPageParam: (lastPage) => lastPage.nextCursor,
         enabled: !!videoId && open,
     });
+
+    const addVideo = trpc.playlists.addVideo.useMutation({
+        onSuccess: (data) => {
+            toast.success("Video added to playlist");
+            utils.playlists.getMany.invalidate();
+            utils.playlists.getManyForVideo.invalidate({ videoId });
+
+            // invalidate playlists.getOne
+        },
+        onError: () => {
+            toast.error("Something went wrong");
+        },
+    });
+
+    const removeVideo = trpc.playlists.removeVideo.useMutation({
+        onSuccess: () => {
+            toast.success("Video removed from playlist");
+            utils.playlists.getMany.invalidate();
+            utils.playlists.getManyForVideo.invalidate({ videoId });
+
+            // invalidate playlists.getOne
+        },
+        onError: () => {
+            toast.error("Something went wrong");
+        },
+    });
     
     return (
         <ResponsiveModal
@@ -48,8 +75,16 @@ export const PlaylistAddModal = ({
                 {!isLoading && 
                     playlists?.pages
                         .flatMap((page) => page.items)
-                        .map((playlist) => (
-                            <Button key={playlist.id} variant="ghost" className="w-full justify-start px-2 [&_svg]:size-5" size="lg" >
+                        .map((playlist) => ( 
+                            <Button key={playlist.id} variant="ghost" className="w-full justify-start px-2 [&_svg]:size-5" size="lg" onClick={() => {
+                                if(playlist.containsVideo) {
+                                    removeVideo.mutate({ playlistId: playlist.id, videoId })
+                                } else {
+                                    addVideo.mutate({ playlistId: playlist.id, videoId })
+                                }
+                            }}
+                            disabled={removeVideo.isPending || addVideo.isPending}
+                            >
                                 {playlist.containsVideo ? (
                                     <SquareCheckIcon className="mr-2" />
                                 ): (
