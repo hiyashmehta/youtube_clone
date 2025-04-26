@@ -6,6 +6,14 @@ import { and, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
 export const subscriptionsRouter = createTRPCRouter({
+    getMany: protectedProcedure
+        .query(async ({ ctx }) => {
+            const subscriptions = await db
+                .select()
+                .from(subscriptions)
+                .where(eq(subscriptions.viewerId, ctx.user.id));
+        }),
+
     create: protectedProcedure
         .input(z.object({ userId: z.string().uuid() }))
         .mutation(async ({ input, ctx }) => {
