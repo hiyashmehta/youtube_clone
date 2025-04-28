@@ -1,4 +1,3 @@
-import { reactionType } from "./schema";
 import { relations } from "drizzle-orm";
 import {
 	foreignKey,
@@ -171,8 +170,7 @@ export const comments = pgTable(
 				columns: [t.parentId],
 				foreignColumns: [t.id],
 				name: "comments_parent_id_fkey",
-			})
-			.onDelete("cascade"),
+			}).onDelete("cascade"),
 		];
 	},
 );
@@ -186,15 +184,15 @@ export const commentRelations = relations(comments, ({ one, many }) => ({
 		fields: [comments.videoId],
 		references: [videos.id],
 	}),
-    parent: one(comments, {
-        fields: [comments.parentId],
-        references: [comments.id],
-        relationName: "comments_parent_id_fkey",
-    }),
+	parent: one(comments, {
+		fields: [comments.parentId],
+		references: [comments.id],
+		relationName: "comments_parent_id_fkey",
+	}),
 	reactions: many(commentReactions),
-    replies: many(comments, {
-        relationName: "comments_parent_id_fkey",
-    }),
+	replies: many(comments, {
+		relationName: "comments_parent_id_fkey",
+	}),
 }));
 
 export const commentSelectSchema = createSelectSchema(comments);
@@ -307,17 +305,25 @@ export const videoReactionSelectSchema = createSelectSchema(videoReactions);
 export const videoReactionInsertSchema = createInsertSchema(videoReactions);
 export const videoReactionUpdateSchema = createUpdateSchema(videoReactions);
 
-export const playlistVideos = pgTable("playlist_videos", {
-	playlistId: uuid("playlist_id").references(() => playlists.id, { onDelete: "cascade" }).notNull(),
-	videoId: uuid("video_id").references(() => videos.id, { onDelete: "cascade" }).notNull(),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (t) => [
-	primaryKey({
-		name: "playlist_videos_pk",
-		columns: [t.playlistId, t.videoId],
-	}),
-]);
+export const playlistVideos = pgTable(
+	"playlist_videos",
+	{
+		playlistId: uuid("playlist_id")
+			.references(() => playlists.id, { onDelete: "cascade" })
+			.notNull(),
+		videoId: uuid("video_id")
+			.references(() => videos.id, { onDelete: "cascade" })
+			.notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [
+		primaryKey({
+			name: "playlist_videos_pk",
+			columns: [t.playlistId, t.videoId],
+		}),
+	],
+);
 
 export const playlistVideoRelations = relations(playlistVideos, ({ one }) => ({
 	playlist: one(playlists, {
@@ -334,7 +340,9 @@ export const playlists = pgTable("playlists", {
 	id: uuid("id").primaryKey().defaultRandom(),
 	name: text("name").notNull(),
 	description: text("description"),
-	userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+	userId: uuid("user_id")
+		.references(() => users.id, { onDelete: "cascade" })
+		.notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

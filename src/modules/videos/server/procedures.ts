@@ -1,533 +1,594 @@
 import { db } from "@/db";
 import { z } from "zod";
-import { subscriptions, users, videoReactions, videos, videoUpdateSchema, videoViews } from "@/db/schema";
+import {
+	subscriptions,
+	users,
+	videoReactions,
+	videos,
+	videoUpdateSchema,
+	videoViews,
+} from "@/db/schema";
 import { mux } from "@/lib/mux";
-import { baseProcedure, createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+	baseProcedure,
+	createTRPCRouter,
+	protectedProcedure,
+} from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, getTableColumns, inArray, isNotNull, lt, or } from "drizzle-orm";
+import {
+	and,
+	desc,
+	eq,
+	getTableColumns,
+	inArray,
+	isNotNull,
+	lt,
+	or,
+} from "drizzle-orm";
 import { UTApi } from "uploadthing/server";
 import { workflow } from "@/lib/workflow";
 
 export const videosRouter = createTRPCRouter({
-    getManySubscribed: baseProcedure
-    .input(
-        z.object({
-            cursor: z.object({
-                id: z.string().uuid(),
-                updatedAt: z.date(),
-            })
-            .nullish(),
-            limit: z.number().min(1).max(100),
-        }),
-    )
-    .query(async ({ input, ctx }) => {
-        const { cursor, limit } = input;
-        const { id: userId } = ctx.user;
+	getManySubscribed: baseProcedure
+		.input(
+			z.object({
+				cursor: z
+					.object({
+						id: z.string().uuid(),
+						updatedAt: z.date(),
+					})
+					.nullish(),
+				limit: z.number().min(1).max(100),
+			}),
+		)
+		.query(async ({ input, ctx }) => {
+			const { cursor, limit } = input;
+			const { clerkUserId } = ctx;
 
-        const viewerSubscriptions = db.$with("viewer_subscriptions").as(
-            db
-                .select({
-                    userId: subscriptions.creatorId,
-                })
-                .from(subscriptions)
-                .where(eq(subscriptions.viewerId, userId))
-        );
+			const viewerSubscriptions = db.$with("viewer_subscriptions").as(
+				db
+					.select({
+						userId: subscriptions.creatorId,
+					})
+					.from(subscriptions)
+					.where(eq(subscriptions.viewerId, clerkUserId!)),
+			);
 
-        const data = await db
-        .with(viewerSubscriptions)
-        .select({
-            ...getTableColumns(videos),
-            user: users,
-            viewCount: db.$count(videoViews, eq(videoViews.videoId, videos.id)),
-            likeCount: db.$count(videoReactions, and(
-                eq(videoReactions.videoId, videos.id),
-                eq(videoReactions.type, "like"),
-            )),
-            dislikeCount: db.$count(videoReactions, and(
-                eq(videoReactions.videoId, videos.id),
-                eq(videoReactions.type, "dislike"),
-            )),
-        })
-        .from(videos)
-        .innerJoin(users, eq(videos.userId, users.id))
-        .innerJoin(
-            viewerSubscriptions,
-            eq(viewerSubscriptions.userId, users.id)
-        )
-        .where(and(
-            eq(videos.visibility, "public"),
-            cursor
-                ? or(
-                    lt(videos.updatedAt, cursor.updatedAt),
-                    and(
-                        eq(videos.updatedAt, cursor.updatedAt),
-                        lt(videos.id, cursor.id)
-                    )
-                )
-                : undefined,
-        )).orderBy(desc(videos.updatedAt), desc(videos.id))
-        .limit(limit + 1);
+			const data = await db
+				.with(viewerSubscriptions)
+				.select({
+					...getTableColumns(videos),
+					user: users,
+					viewCount: db.$count(
+						videoViews,
+						eq(videoViews.videoId, videos.id),
+					),
+					likeCount: db.$count(
+						videoReactions,
+						and(
+							eq(videoReactions.videoId, videos.id),
+							eq(videoReactions.type, "like"),
+						),
+					),
+					dislikeCount: db.$count(
+						videoReactions,
+						and(
+							eq(videoReactions.videoId, videos.id),
+							eq(videoReactions.type, "dislike"),
+						),
+					),
+				})
+				.from(videos)
+				.innerJoin(users, eq(videos.userId, users.id))
+				.innerJoin(
+					viewerSubscriptions,
+					eq(viewerSubscriptions.userId, users.id),
+				)
+				.where(
+					and(
+						eq(videos.visibility, "public"),
+						cursor
+							? or(
+									lt(videos.updatedAt, cursor.updatedAt),
+									and(
+										eq(videos.updatedAt, cursor.updatedAt),
+										lt(videos.id, cursor.id),
+									),
+							  )
+							: undefined,
+					),
+				)
+				.orderBy(desc(videos.updatedAt), desc(videos.id))
+				.limit(limit + 1);
 
-        const hasMore = data.length > limit;
-        // Remove the last item if there is more data
-        const items = hasMore ? data.slice(0, -1) : data;
-        // Set the next cursor to the last item if there is more data
-        const lastItem = items[items.length -1];
-        const nextCursor = hasMore 
-        ? {
-            id: lastItem.id,
-            updatedAt: lastItem.updatedAt,
-        }
-        : null
+			const hasMore = data.length > limit;
+			// Remove the last item if there is more data
+			const items = hasMore ? data.slice(0, -1) : data;
+			// Set the next cursor to the last item if there is more data
+			const lastItem = items[items.length - 1];
+			const nextCursor = hasMore
+				? {
+						id: lastItem.id,
+						updatedAt: lastItem.updatedAt,
+				  }
+				: null;
 
-        return {
-            items,
-            nextCursor,
-        };
-    }),
+			return {
+				items,
+				nextCursor,
+			};
+		}),
 
-    getManyTrending: baseProcedure
-    .input(
-        z.object({
-            cursor: z.object({
-                id: z.string().uuid(),
-                viewCount: z.number(),
-            })
-            .nullish(),
-            limit: z.number().min(1).max(100),
-        }),
-    )
-    .query(async ({ input }) => {
-        const { cursor, limit } = input;
+	getManyTrending: baseProcedure
+		.input(
+			z.object({
+				cursor: z
+					.object({
+						id: z.string().uuid(),
+						viewCount: z.number(),
+					})
+					.nullish(),
+				limit: z.number().min(1).max(100),
+			}),
+		)
+		.query(async ({ input }) => {
+			const { cursor, limit } = input;
 
-        const viewCountSubquery = db.$count(
-            videoViews,
-            eq(videoViews.videoId, videos.id),
-        );
+			const viewCountSubquery = db.$count(
+				videoViews,
+				eq(videoViews.videoId, videos.id),
+			);
 
-        const data = await db
-        .select({
-            ...getTableColumns(videos),
-            user: users,
-            viewCount: viewCountSubquery,
-            likeCount: db.$count(videoReactions, and(
-                eq(videoReactions.videoId, videos.id),
-                eq(videoReactions.type, "like"),
-            )),
-            dislikeCount: db.$count(videoReactions, and(
-                eq(videoReactions.videoId, videos.id),
-                eq(videoReactions.type, "dislike"),
-            )),
-        })
-        .from(videos)
-        .innerJoin(users, eq(videos.userId, users.id))
-        .where(and(
-            eq(videos.visibility, "public"),
-            cursor
-                ? or(
-                    lt(viewCountSubquery, cursor.viewCount),
-                    and(
-                        eq(viewCountSubquery, cursor.viewCount),
-                        lt(videos.id, cursor.id)
-                    )
-                )
-                : undefined,
-        )).orderBy(desc(viewCountSubquery), desc(videos.id))
-        .limit(limit + 1);
+			const data = await db
+				.select({
+					...getTableColumns(videos),
+					user: users,
+					viewCount: viewCountSubquery,
+					likeCount: db.$count(
+						videoReactions,
+						and(
+							eq(videoReactions.videoId, videos.id),
+							eq(videoReactions.type, "like"),
+						),
+					),
+					dislikeCount: db.$count(
+						videoReactions,
+						and(
+							eq(videoReactions.videoId, videos.id),
+							eq(videoReactions.type, "dislike"),
+						),
+					),
+				})
+				.from(videos)
+				.innerJoin(users, eq(videos.userId, users.id))
+				.where(
+					and(
+						eq(videos.visibility, "public"),
+						cursor
+							? or(
+									lt(viewCountSubquery, cursor.viewCount),
+									and(
+										eq(viewCountSubquery, cursor.viewCount),
+										lt(videos.id, cursor.id),
+									),
+							  )
+							: undefined,
+					),
+				)
+				.orderBy(desc(viewCountSubquery), desc(videos.id))
+				.limit(limit + 1);
 
-        const hasMore = data.length > limit;
-        // Remove the last item if there is more data
-        const items = hasMore ? data.slice(0, -1) : data;
-        // Set the next cursor to the last item if there is more data
-        const lastItem = items[items.length -1];
-        const nextCursor = hasMore 
-        ? {
-            id: lastItem.id,
-            viewCount: lastItem.viewCount,
-        }
-        : null
+			const hasMore = data.length > limit;
+			// Remove the last item if there is more data
+			const items = hasMore ? data.slice(0, -1) : data;
+			// Set the next cursor to the last item if there is more data
+			const lastItem = items[items.length - 1];
+			const nextCursor = hasMore
+				? {
+						id: lastItem.id,
+						viewCount: lastItem.viewCount,
+				  }
+				: null;
 
-        return {
-            items,
-            nextCursor,
-        };
-    }),
+			return {
+				items,
+				nextCursor,
+			};
+		}),
 
-    getMany: baseProcedure
-    .input(
-        z.object({
-            categoryId: z.string().uuid().optional(),
-            userId: z.string().uuid().optional(),
-            cursor: z.object({
-                id: z.string().uuid(),
-                updatedAt: z.date(),
-            })
-            .nullish(),
-            limit: z.number().min(1).max(100),
-        }),
-    )
-    .query(async ({ input }) => {
-        const { cursor, limit, categoryId, userId } = input;
+	getMany: baseProcedure
+		.input(
+			z.object({
+				categoryId: z.string().uuid().optional(),
+				userId: z.string().uuid().optional(),
+				cursor: z
+					.object({
+						id: z.string().uuid(),
+						updatedAt: z.date(),
+					})
+					.nullish(),
+				limit: z.number().min(1).max(100),
+			}),
+		)
+		.query(async ({ input }) => {
+			const { cursor, limit, categoryId, userId } = input;
 
-        const data = await db
-        .select({
-            ...getTableColumns(videos),
-            user: users,
-            viewCount: db.$count(videoViews, eq(videoViews.videoId, videos.id)),
-            likeCount: db.$count(videoReactions, and(
-                eq(videoReactions.videoId, videos.id),
-                eq(videoReactions.type, "like"),
-            )),
-            dislikeCount: db.$count(videoReactions, and(
-                eq(videoReactions.videoId, videos.id),
-                eq(videoReactions.type, "dislike"),
-            )),
-        })
-        .from(videos)
-        .innerJoin(users, eq(videos.userId, users.id))
-        .where(and(
-            eq(videos.visibility, "public"),
-            categoryId ? eq(videos.categoryId, categoryId) : undefined,
-            userId ? eq(videos.userId, userId) : undefined,
-            cursor
-                ? or(
-                    lt(videos.updatedAt, cursor.updatedAt),
-                    and(
-                        eq(videos.updatedAt, cursor.updatedAt),
-                        lt(videos.id, cursor.id)
-                    )
-                )
-                : undefined,
-        )).orderBy(desc(videos.updatedAt), desc(videos.id))
-        .limit(limit + 1);
+			const data = await db
+				.select({
+					...getTableColumns(videos),
+					user: users,
+					viewCount: db.$count(
+						videoViews,
+						eq(videoViews.videoId, videos.id),
+					),
+					likeCount: db.$count(
+						videoReactions,
+						and(
+							eq(videoReactions.videoId, videos.id),
+							eq(videoReactions.type, "like"),
+						),
+					),
+					dislikeCount: db.$count(
+						videoReactions,
+						and(
+							eq(videoReactions.videoId, videos.id),
+							eq(videoReactions.type, "dislike"),
+						),
+					),
+				})
+				.from(videos)
+				.innerJoin(users, eq(videos.userId, users.id))
+				.where(
+					and(
+						eq(videos.visibility, "public"),
+						categoryId
+							? eq(videos.categoryId, categoryId)
+							: undefined,
+						userId ? eq(videos.userId, userId) : undefined,
+						cursor
+							? or(
+									lt(videos.updatedAt, cursor.updatedAt),
+									and(
+										eq(videos.updatedAt, cursor.updatedAt),
+										lt(videos.id, cursor.id),
+									),
+							  )
+							: undefined,
+					),
+				)
+				.orderBy(desc(videos.updatedAt), desc(videos.id))
+				.limit(limit + 1);
 
-        const hasMore = data.length > limit;
-        // Remove the last item if there is more data
-        const items = hasMore ? data.slice(0, -1) : data;
-        // Set the next cursor to the last item if there is more data
-        const lastItem = items[items.length -1];
-        const nextCursor = hasMore 
-        ? {
-            id: lastItem.id,
-            updatedAt: lastItem.updatedAt,
-        }
-        : null
+			const hasMore = data.length > limit;
+			// Remove the last item if there is more data
+			const items = hasMore ? data.slice(0, -1) : data;
+			// Set the next cursor to the last item if there is more data
+			const lastItem = items[items.length - 1];
+			const nextCursor = hasMore
+				? {
+						id: lastItem.id,
+						updatedAt: lastItem.updatedAt,
+				  }
+				: null;
 
-        return {
-            items,
-            nextCursor,
-        };
-    }),
+			return {
+				items,
+				nextCursor,
+			};
+		}),
 
-    getOne: baseProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input, ctx  }) => {
-        const { clerkUserId } = ctx;
+	getOne: baseProcedure
+		.input(z.object({ id: z.string().uuid() }))
+		.query(async ({ input, ctx }) => {
+			const { clerkUserId } = ctx;
 
-        let userId;
+			let userId;
 
-        const [user] = await db
-            .select()
-            .from(users)
-            .where(inArray(users.clerkId, clerkUserId ? [clerkUserId] : []))
+			const [user] = await db
+				.select()
+				.from(users)
+				.where(
+					inArray(users.clerkId, clerkUserId ? [clerkUserId] : []),
+				);
 
-        if(user) {
-            userId = user.id;
-        }
-        
-        const viewerReactions = db.$with("viewer_reactions").as(
-            db
-                .select({
-                    videoId: videoReactions.videoId,
-                    type: videoReactions.type,
-                })
-                .from(videoReactions)
-                .where(inArray(videoReactions.userId, userId ? [userId] : []))
-        );
+			if (user) {
+				userId = user.id;
+			}
 
-        const viewerSubscriptions = db.$with("viewer_subscriptions").as(
-            db
-                .select()
-                .from(subscriptions)
-                .where(inArray(subscriptions.viewerId, userId ? [userId] : []))
-        )
+			const viewerReactions = db.$with("viewer_reactions").as(
+				db
+					.select({
+						videoId: videoReactions.videoId,
+						type: videoReactions.type,
+					})
+					.from(videoReactions)
+					.where(
+						inArray(videoReactions.userId, userId ? [userId] : []),
+					),
+			);
 
-        const [existingVideo] = await db
-            .with(viewerReactions, viewerSubscriptions)
-            .select({
-                ...getTableColumns(videos),
-                user: {
-                    ...getTableColumns(users),
-                    subscriberCount: db.$count(subscriptions, eq(subscriptions.creatorId, users.id)), 
-                    viewerSubscribed: isNotNull(viewerSubscriptions.viewerId).mapWith(Boolean),
-                },
-                viewCount: db.$count(videoViews, eq(videoViews.videoId, videos.id)),
-                likeCount: db.$count(
-                    videoReactions,
-                    and(
-                        eq(videoReactions.videoId, videos.id),
-                        eq(videoReactions.type, "like"),
-                    ),
-                ),
-                dislikeCount: db.$count(
-                    videoReactions,
-                    and(
-                        eq(videoReactions.videoId, videos.id),
-                        eq(videoReactions.type, "dislike"),
-                    ),
-                ),
-                viewerReaction: viewerReactions.type
-            })
-            .from(videos)
-            .innerJoin(users, eq(videos.userId, users.id))
-            .leftJoin(viewerReactions, eq(viewerReactions.videoId, videos.id))
-            .leftJoin(viewerSubscriptions, eq(viewerSubscriptions.creatorId, users.id))
-            .where(eq(videos.id, input.id))
+			const viewerSubscriptions = db.$with("viewer_subscriptions").as(
+				db
+					.select()
+					.from(subscriptions)
+					.where(
+						inArray(subscriptions.viewerId, userId ? [userId] : []),
+					),
+			);
 
-        if(!existingVideo) {
-            throw new TRPCError({ code: "NOT_FOUND" });
-        }
+			const [existingVideo] = await db
+				.with(viewerReactions, viewerSubscriptions)
+				.select({
+					...getTableColumns(videos),
+					user: {
+						...getTableColumns(users),
+						subscriberCount: db.$count(
+							subscriptions,
+							eq(subscriptions.creatorId, users.id),
+						),
+						viewerSubscribed: isNotNull(
+							viewerSubscriptions.viewerId,
+						).mapWith(Boolean),
+					},
+					viewCount: db.$count(
+						videoViews,
+						eq(videoViews.videoId, videos.id),
+					),
+					likeCount: db.$count(
+						videoReactions,
+						and(
+							eq(videoReactions.videoId, videos.id),
+							eq(videoReactions.type, "like"),
+						),
+					),
+					dislikeCount: db.$count(
+						videoReactions,
+						and(
+							eq(videoReactions.videoId, videos.id),
+							eq(videoReactions.type, "dislike"),
+						),
+					),
+					viewerReaction: viewerReactions.type,
+				})
+				.from(videos)
+				.innerJoin(users, eq(videos.userId, users.id))
+				.leftJoin(
+					viewerReactions,
+					eq(viewerReactions.videoId, videos.id),
+				)
+				.leftJoin(
+					viewerSubscriptions,
+					eq(viewerSubscriptions.creatorId, users.id),
+				)
+				.where(eq(videos.id, input.id));
 
-        return existingVideo;
-    }),
-    generateDescription: protectedProcedure
-    .input(z.object({ id: z.string().uuid()}))
-    .mutation(async ({ ctx, input  }) => {
-        const { id: userId } = ctx.user;
+			if (!existingVideo) {
+				throw new TRPCError({ code: "NOT_FOUND" });
+			}
 
-        const { workflowRunId } = await workflow.trigger({
-            url: `${process.env.UPSTASH_WORKFLOW_URL}/api/videos/workflows/description`,
-            body: { userId, videoId: input.id },
-        });
+			return existingVideo;
+		}),
+	generateDescription: protectedProcedure
+		.input(z.object({ id: z.string().uuid() }))
+		.mutation(async ({ ctx, input }) => {
+			const { id: userId } = ctx.user;
 
-        return { workflowRunId };
-    }),
-    generateTitle: protectedProcedure
-    .input(z.object({ id: z.string().uuid()}))
-    .mutation(async ({ ctx, input  }) => {
-        const { id: userId } = ctx.user;
+			const { workflowRunId } = await workflow.trigger({
+				url: `${process.env.UPSTASH_WORKFLOW_URL}/api/videos/workflows/description`,
+				body: { userId, videoId: input.id },
+			});
 
-        const { workflowRunId } = await workflow.trigger({
-            url: `${process.env.UPSTASH_WORKFLOW_URL}/api/videos/workflows/title`,
-            body: { userId, videoId: input.id },
-        });
+			return { workflowRunId };
+		}),
+	generateTitle: protectedProcedure
+		.input(z.object({ id: z.string().uuid() }))
+		.mutation(async ({ ctx, input }) => {
+			const { id: userId } = ctx.user;
 
-        return { workflowRunId };
-    }),
-    generateThumbnail: protectedProcedure
-    .input(z.object({ id: z.string().uuid(), prompt: z.string().min(10) }))
-    .mutation(async ({ ctx, input  }) => {
-        const { id: userId } = ctx.user;
+			const { workflowRunId } = await workflow.trigger({
+				url: `${process.env.UPSTASH_WORKFLOW_URL}/api/videos/workflows/title`,
+				body: { userId, videoId: input.id },
+			});
 
-        const { workflowRunId } = await workflow.trigger({
-            url: `${process.env.UPSTASH_WORKFLOW_URL}/api/videos/workflows/thumbnail`,
-            body: { userId, videoId: input.id, prompt: input.prompt },
-        });
+			return { workflowRunId };
+		}),
+	generateThumbnail: protectedProcedure
+		.input(z.object({ id: z.string().uuid(), prompt: z.string().min(10) }))
+		.mutation(async ({ ctx, input }) => {
+			const { id: userId } = ctx.user;
 
-        return { workflowRunId };
-    }),
-    revalidate: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-        const { id: userId } = ctx.user;
+			const { workflowRunId } = await workflow.trigger({
+				url: `${process.env.UPSTASH_WORKFLOW_URL}/api/videos/workflows/thumbnail`,
+				body: { userId, videoId: input.id, prompt: input.prompt },
+			});
 
-        const [existingVideo] = await db
-            .select()
-            .from(videos)
-            .where(and(
-                eq(videos.id, input.id),
-                eq(videos.userId, userId),
-            ));
+			return { workflowRunId };
+		}),
+	revalidate: protectedProcedure
+		.input(z.object({ id: z.string().uuid() }))
+		.mutation(async ({ ctx, input }) => {
+			const { id: userId } = ctx.user;
 
-        if(!existingVideo) {
-            throw new TRPCError({ code: "NOT_FOUND" });
-        }
+			const [existingVideo] = await db
+				.select()
+				.from(videos)
+				.where(and(eq(videos.id, input.id), eq(videos.userId, userId)));
 
-        if(!existingVideo.muxUploadId) {
-            throw new TRPCError({ code: "BAD_REQUEST" });
-        }
+			if (!existingVideo) {
+				throw new TRPCError({ code: "NOT_FOUND" });
+			}
 
-        const upload = await mux.Video.Uploads.retrieve(
-            existingVideo.muxUploadId
-        );
+			if (!existingVideo.muxUploadId) {
+				throw new TRPCError({ code: "BAD_REQUEST" });
+			}
 
-        if(!upload || upload.asset_id) {
-            throw new TRPCError({ code: "BAD_REQUEST" })
-        }
+			const upload = await mux.video.uploads.retrieve(
+				existingVideo.muxUploadId,
+			);
 
-        const asset = await mux.Video.Assets.retrieve(
-            upload.asset_id
-        );
+			if (!upload || upload.asset_id) {
+				throw new TRPCError({ code: "BAD_REQUEST" });
+			}
 
-        if(!asset) {
-            throw new TRPCError({ code: "BAD_REQUEST" })
-        }
+			const asset = await mux.video.assets.retrieve(upload.asset_id!);
 
-        const playbackId = asset.playback_ids?.[0].id;
-        const duration = asset.duration ? Math.round(asset.duration * 1000) : 0;
-        
-        // TODO: Potentially find a way to revalidate trackId and trackStatus as well
+			if (!asset) {
+				throw new TRPCError({ code: "BAD_REQUEST" });
+			}
 
-        const [updatedVideo] = await db
-            .update(videos)
-            .set({
-                muxStatus: asset.status,
-                muxPlaybackId: playbackId,
-                muxAssetId: asset.id,
-                duration,
-            })
-            .where(and(
-                eq(videos.id, input.id),
-                eq(videos.userId, userId),
-            ))
-            .returning();
+			const playbackId = asset.playback_ids?.[0].id;
+			const duration = asset.duration
+				? Math.round(asset.duration * 1000)
+				: 0;
 
-        return updatedVideo;
-    }),
-    restoreThumbnail: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-        const { id: userId } = ctx.user;
+			// TODO: Potentially find a way to revalidate trackId and trackStatus as well
 
-        const [existingVideo] = await db
-            .select()
-            .from(videos)
-            .where(and(
-                eq(videos.id, input.id),
-                eq(videos.userId, userId),
-            ));
+			const [updatedVideo] = await db
+				.update(videos)
+				.set({
+					muxStatus: asset.status,
+					muxPlaybackId: playbackId,
+					muxAssetId: asset.id,
+					duration,
+				})
+				.where(and(eq(videos.id, input.id), eq(videos.userId, userId)))
+				.returning();
 
-            if(!existingVideo) {
-                throw new TRPCError({ code: "NOT_FOUND" });
-            }
+			return updatedVideo;
+		}),
+	restoreThumbnail: protectedProcedure
+		.input(z.object({ id: z.string().uuid() }))
+		.mutation(async ({ ctx, input }) => {
+			const { id: userId } = ctx.user;
 
-            if(existingVideo.thumbnailKey) {
-                const utapi = new UTApi();
+			const [existingVideo] = await db
+				.select()
+				.from(videos)
+				.where(and(eq(videos.id, input.id), eq(videos.userId, userId)));
 
-                await utapi.deleteFiles(existingVideo.thumbnailKey);
-                await db
-                    .update(videos)
-                    .set({ thumbnailKey: null, thumbnailUrl: null })
-                    .where(and(
-                        eq(videos.id, input.id),
-                        eq(videos.userId, userId)
-                    ));
-            }
+			if (!existingVideo) {
+				throw new TRPCError({ code: "NOT_FOUND" });
+			}
 
-            if(!existingVideo.muxPlaybackId) {
-                throw new TRPCError({ code: "BAD_REQUEST" });
-            }
+			if (existingVideo.thumbnailKey) {
+				const utapi = new UTApi();
 
-        const utapi = new UTApi();
+				await utapi.deleteFiles(existingVideo.thumbnailKey);
+				await db
+					.update(videos)
+					.set({ thumbnailKey: null, thumbnailUrl: null })
+					.where(
+						and(eq(videos.id, input.id), eq(videos.userId, userId)),
+					);
+			}
 
-        const tempThumbnailUrl = `https://image.mux.com/${existingVideo.muxPlaybackId}/thumbnail.jpg`;
-        const uploadedThumbnail = await utapi.uploadFilesFromUrl([tempThumbnailUrl]);
-        
-        if(!uploadedThumbnail?.data) {
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        }
+			if (!existingVideo.muxPlaybackId) {
+				throw new TRPCError({ code: "BAD_REQUEST" });
+			}
 
-        const { key: thumbnailKey, url: thumbnailUrl } = uploadedThumbnail?.data;
+			const utapi = new UTApi();
 
-        const [updatedVideo] = await db
-            .update(videos)
-            .set({ thumbnailUrl, thumbnailKey })
-            .where(and(
-                eq(videos.id, input.id),
-                eq(videos.userId, userId)
-            ))
-            .returning();
+			const tempThumbnailUrl = `https://image.mux.com/${existingVideo.muxPlaybackId}/thumbnail.jpg`;
+			const uploadedThumbnail = await utapi.uploadFilesFromUrl([
+				tempThumbnailUrl,
+			]);
 
-        return updatedVideo;
-            
-    }),
-    remove: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-        const { id: userId } = ctx.user;
+			if (!uploadedThumbnail[0].data) {
+				throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+			}
 
-        const [removedVideo] = await db
-            .delete(videos)
-            .where(and(
-                eq(videos.id, input.id),
-                eq(videos.userId, userId)
-            ))
-            .returning();
+			const { key: thumbnailKey, url: thumbnailUrl } =
+				uploadedThumbnail[0].data;
 
-            if (!removedVideo) {
-                throw new TRPCError({ code: "NOT_FOUND" });
-            }
+			const [updatedVideo] = await db
+				.update(videos)
+				.set({ thumbnailUrl, thumbnailKey })
+				.where(and(eq(videos.id, input.id), eq(videos.userId, userId)))
+				.returning();
 
-            return removedVideo;
-    }),
+			return updatedVideo;
+		}),
+	remove: protectedProcedure
+		.input(z.object({ id: z.string().uuid() }))
+		.mutation(async ({ ctx, input }) => {
+			const { id: userId } = ctx.user;
 
-    update: protectedProcedure
-    .input(videoUpdateSchema)
-    .mutation(async ({ ctx, input }) => {
-        const { id: userId } = ctx.user;
+			const [removedVideo] = await db
+				.delete(videos)
+				.where(and(eq(videos.id, input.id), eq(videos.userId, userId)))
+				.returning();
 
-        if(!input.id) {
-            throw new TRPCError({ code: "BAD_REQUEST" });
-        }
+			if (!removedVideo) {
+				throw new TRPCError({ code: "NOT_FOUND" });
+			}
 
-        const [updatedVideo] = await db
-            .update(videos)
-            .set({
-                title: input.title,
-                description: input.description,
-                categoryId: input.categoryId,
-                visibility: input.visibility,
-                updatedAt: new Date(),
-            })
-            .where(and(
-                eq(videos.id, input.id),
-                eq(videos.userId, userId),
-            ))
-            .returning();
+			return removedVideo;
+		}),
 
-            if (!updatedVideo) {
-                throw new TRPCError({ code: "NOT_FOUND" });
-            }
+	update: protectedProcedure
+		.input(videoUpdateSchema)
+		.mutation(async ({ ctx, input }) => {
+			const { id: userId } = ctx.user;
 
-            return updatedVideo;
-    }),
-    create: protectedProcedure.mutation(async ({ ctx }) => {
-        const { id: userId } = ctx.user;
+			if (!input.id) {
+				throw new TRPCError({ code: "BAD_REQUEST" });
+			}
 
-        // throw new TRPCError({ code: "BAD_REQUEST", message: "Not implemented" });
+			const [updatedVideo] = await db
+				.update(videos)
+				.set({
+					title: input.title,
+					description: input.description,
+					categoryId: input.categoryId,
+					visibility: input.visibility,
+					updatedAt: new Date(),
+				})
+				.where(and(eq(videos.id, input.id), eq(videos.userId, userId)))
+				.returning();
 
-        const upload = await mux.video.uploads.create({
-            new_asset_settings: {
-                passthrough: userId,
-                playback_policy: ["public"],
-                mp4_support: "standard",
-                input: [
-                    {
-                        generated_subtitles: [
-                            {
-                                language_code: "en",
-                                name: "English",
-                            },
-                        ],
-                    },
-                ],
-            },
-            cors_origin: '*',
-        });
+			if (!updatedVideo) {
+				throw new TRPCError({ code: "NOT_FOUND" });
+			}
 
-        const [video] = await db
-            .insert(videos)
-            .values({
-                userId,
-                title: "untitled",
-                muxStatus: "waiting",
-                muxUploadId: upload.id,
-            })
-            .returning();
+			return updatedVideo;
+		}),
+	create: protectedProcedure.mutation(async ({ ctx }) => {
+		const { id: userId } = ctx.user;
 
-            return {
-                video: video,
-                url: upload.url,
-            };
-    }),
+		// throw new TRPCError({ code: "BAD_REQUEST", message: "Not implemented" });
+
+		const upload = await mux.video.uploads.create({
+			new_asset_settings: {
+				passthrough: userId,
+				playback_policy: ["public"],
+				mp4_support: "standard",
+				input: [
+					{
+						generated_subtitles: [
+							{
+								language_code: "en",
+								name: "English",
+							},
+						],
+					},
+				],
+			},
+			cors_origin: "*",
+		});
+
+		const [video] = await db
+			.insert(videos)
+			.values({
+				userId,
+				title: "untitled",
+				muxStatus: "waiting",
+				muxUploadId: upload.id,
+			})
+			.returning();
+
+		return {
+			video: video,
+			url: upload.url,
+		};
+	}),
 });

@@ -39,7 +39,7 @@ interface VideoRowCardProps extends VariantProps<typeof videoRowCardVariants>{
     onRemove?: () => void;
 };
 
-export const VideoRowCardSkeleton = ({ size = "default" }: VideoRowCardProps<typeof videoRowCardVariants>) => {
+export const VideoRowCardSkeleton = ({ size = "default" }: VariantProps<typeof videoRowCardVariants>) => {
     return (
         <div className={videoRowCardVariants({ size })}>
             {/* Thumbnail Skeleton */}
@@ -127,17 +127,18 @@ export const VideoRowCard = ({
                                         name={data.user.name}
                                     />
                                     <UserInfo
-                                        sixe="sm" name={data.user.name}
+                                        size="sm"
+                                        name={data.user.name}
                                     />
                                 </div>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <p className="text-xs text-muted-foreground w-fit line-clamp-2">
-                                            {data.description} ? "No description"
+                                            {data.description ? data.description : "No description"}
                                         </p>
                                     </TooltipTrigger>
                                     <TooltipContent
-                                        side="button"
+                                        side="bottom"
                                         align="center"
                                         className="bg-black/70"
                                     >

@@ -5,20 +5,20 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 export const GET = async () => {
-    const { userid } = await auth();
+	const { userId } = await auth();
 
-    if(!userid) {
-        return redirect("/sign-in");
-    }
+	if (!userId) {
+		return redirect("/sign-in");
+	}
 
-    const [existingUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.clerkId, userid));
+	const [existingUser] = await db
+		.select()
+		.from(users)
+		.where(eq(users.clerkId, userId));
 
-    if(!existingUser) {
-        return redirect('/sign-in');
-    }
+	if (!existingUser) {
+		return redirect("/sign-in");
+	}
 
-    return redirect(`/users/${existingUser.id}`);
-}
+	return redirect(`/users/${existingUser.id}`);
+};

@@ -83,7 +83,7 @@ export const PlaylistCreateModal = ({
                     />
                     <div className="flex justify-end">
                         <Button 
-                            disabled={create.isLoading}
+                            disabled={create.isPending}
                             type="submit"
                         >
                             Create Playlist
